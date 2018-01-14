@@ -8,7 +8,7 @@ from astropy.io import fits
 
 import sys
 sys.path.append(".")
-from DMModels3 import *
+from DMModels import *
 
 RA  = 187.70355641
 DEC = 12.39063989

@@ -14,7 +14,7 @@ from astropy.io import fits
 
 import sys
 sys.path.append("../py")
-from DMModels3 import *
+from DMModels import *
 
 calc_TS = False
 
