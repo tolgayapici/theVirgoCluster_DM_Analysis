@@ -99,3 +99,22 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# this part is added by Tolga Yapici
+# this is to not commit HAWC data to public
+data
+data/*
+
+# this part is added by Tolga Yapici
+# this is to not commit HAWC related analysis/results
+# to public
+LL_profiles
+LL_profiles/*
+model_maps
+model_maps/*
+
+# this part is added by Tolga Yapici
+# this is to not commit any noteboks
+# since some of the unofficial results
+# may show in them
+*.ipynb
