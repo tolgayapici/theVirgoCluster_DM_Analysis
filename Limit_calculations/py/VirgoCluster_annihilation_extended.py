@@ -1,4 +1,13 @@
-from threeML import *
+
+# stop ROOT hijacking the command line options
+import ROOT
+ROOT.PyConfig.IgnoreCommandLineOptions = True
+
+import warnings
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    from threeML import *
+
 import numpy as np
 import pdb
 import os
@@ -6,14 +15,15 @@ import matplotlib.pyplot as plt
 
 from astropy.io import fits
 
+import argparse
+
 import sys
 sys.path.append(".")
 from DMModels import *
 
-RA  = 187.70355641
-DEC = 12.39063989
-
-calc_TS = False
+calc_TS = True#False
+crosssection_lo = 1e-24
+crosssection_hi = 1e-21
 
 class Sources():
 
@@ -37,16 +47,14 @@ class Sources():
         Jmax_M87 = float(line.split("=")[1])
         self.ra_M87  = fits.open(M87_fits_template)[0].header['CRVAL1']
         self.dec_M87 = fits.open(M87_fits_template)[0].header['CRVAL2']
-
         # spectrum
         spec_M87               = DMAnnihilationFlux()
         spec_M87.mass          = self.mass
         spec_M87.J             = np.power(10.,Jmax_M87)
-        spec_M87.sigmav.bounds = (1e-27,1e-22)
-        spec_M87.sigmav        = 1e-23
+        spec_M87.sigmav.bounds = (crosssection_lo, crosssection_hi)#(1e-24,1e-20)
+        spec_M87.sigmav        = 1e-22
         spec_M87.channel       = self.channel
         spec_M87.J.fix         = True
-
         # set source
         self.source_M87 = ExtendedSource("M87",spatial_shape=shape_M87,spectral_shape=spec_M87)
     
@@ -60,16 +68,14 @@ class Sources():
         Jmax_M49 = float(line.split("=")[1])
         self.ra_M49  = fits.open(M49_fits_template)[0].header['CRVAL1']
         self.dec_M49 = fits.open(M49_fits_template)[0].header['CRVAL2']
-
         # spectrum
         spec_M49 = DMAnnihilationFlux()
         spec_M49.mass          = self.mass
         spec_M49.J             = np.power(10.,Jmax_M49)
-        spec_M49.sigmav.bounds = (1e-27,1e-22)
-        spec_M49.sigmav        = 1e-23
+        spec_M49.sigmav.bounds = (crosssection_lo, crosssection_hi)#(1e-24,1e-20)
+        spec_M49.sigmav        = 1e-22
         spec_M49.channel       = self.channel
         spec_M49.J.fix         = True
-
         # set source
         self.source_M49 = ExtendedSource("M49",spatial_shape=shape_M49,spectral_shape=spec_M49)
     
@@ -134,17 +140,27 @@ class Identity(Function1D):
     def evaluate(self, x, scale):
         return scale * x
 
-mass    = float(sys.argv[1])
-channel = int(float(sys.argv[2]))
-DM_model = sys.argv[3]
-add_point_source = sys.argv[4]
+
+parser = argparse.ArgumentParser(description="This script is to run extended source DM search for the Virgo Cluster")
+parser.add_argument("-m", dest="mass",    help="Mass of the DM particle (in GeV)",   required=True, type=float)
+parser.add_argument("-c", dest="channel", help="Annihilation channel",               required=True, choices=[1, 2, 3, 4, 5], type=int)
+parser.add_argument("-t", dest="model",   help="DM Template",                        required=True, choices=["GAO", "B01"])
+parser.add_argument("-a", dest="add",     help="A flag to add the M87 point source", default=0)
+parser.add_argument("-e", dest="exp",     help="Experiment name of the add flag is True", choices=["VERITAS", "MAGIC"])
+parser.add_argument("-v", dest="verbose", help="Verbosity of the script",            default=True)
+parsed_args = parser.parse_args()
+
+mass             = parsed_args.mass#float(sys.argv[1])
+channel          = parsed_args.channel#int(float(sys.argv[2]))
+DM_model         = parsed_args.model#sys.argv[3]
+add_point_source = parsed_args.add#sys.argv[4]
 if add_point_source:
     try:
-        experiment = sys.argv[5]
+        experiment = parsed_args.exp#sys.argv[5]
     except:
         experiment = 'VERITAS'
         
-verbose = True
+verbose = parsed_args.verbose#True
 print("running for mass {} GeV".format(mass))
 print("            channel {}".format(channel))
 
@@ -177,25 +193,34 @@ jl = JointLikelihood(model, datalist, verbose=True)
 jl.set_minimizer("ROOT")
 
 if calc_TS:
-    jl.fit(quiet=False)
-    print("TS_max: {}".format(llh.calc_TS()))
+    jl.fit(quiet=True)
+    best_fit_TS = llh.calc_TS()
+    print("TS_max: {}".format(best_fit_TS))
     print("Best fit sigmav: {}".format(model.M87.spectrum.main.DMAnnihilationFlux.sigmav))
     llh.write_model_map("../results/model_maps/{}GeV_{}.root".format(mass, channel))
-
+    
 # calculate the profile for 95% CL computation
 search_size = 40
-norms = np.linspace(-24, -20, search_size)
+best_fit    = model.M87.spectrum.main.DMAnnihilationFlux.sigmav.value
+norms = np.linspace(np.log10(best_fit)-.1, np.log10(best_fit)+1., search_size)
 LLs  = np.zeros(search_size)
-
+TSs  = np.zeros(search_size)
 print("will start the LL calculations")
 
 for i in range(search_size):
+    #model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = 10**norms[i]
+    #TSs[i] = llh.calc_TS()
+    #print(norms[i], TSs[i])
     LLs[i] = jl.minus_log_like_profile(norms[i])
-    
+#print(TSs)
+
+#plt.semilogx(10**norms, TSs-best_fit_TS)
+#plt.show()
+
 delLLs = LLs - LLs.min()
 imin   = np.argmin(delLLs)
 plt.semilogx(10**norms, delLLs)
-plt.xlim(1e-24, 1e-20)
+plt.xlim(np.log10(best_fit)-.1, np.log10(best_fit)+.6)
 plt.ylim(0, 3)
 
 plt.savefig("../results/LL_profiles/annihilation_{}GeV_{}_{}.eps".format(mass, channel, DM_model))
@@ -203,3 +228,4 @@ interpolator = interp1d(delLLs[imin:],10**norms[imin:], kind='cubic', fill_value
 norm_95cl = interpolator(2.71/2.)
 
 print("95% CL norm: {}".format(norm_95cl))
+
