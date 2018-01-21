@@ -1,10 +1,24 @@
-from threeML import *
+# take care of matplotlib to use correct
+import matplotlib as mpl
+mpl.use("agg")
+
+# stop ROOT hijacking the command line options
+import ROOT
+ROOT.PyConfig.IgnoreCommandLineOptions = True
+
+import warnings
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    from threeML import *
+
 import numpy as np
 import pdb
 import os
 import matplotlib.pyplot as plt
 
 from astropy.io import fits
+
+import argparse
 
 import sys
 sys.path.append(".")
@@ -123,17 +137,27 @@ class Identity(Function1D):
     def evaluate(self, x, scale):
         return scale * x
 
-mass    = float(sys.argv[1])
-channel = int(float(sys.argv[2]))
-DM_model = sys.argv[3]
-add_point_source = sys.argv[4]
+parser = argparse.ArgumentParser(description="This script is to run extended source DM search for the Virgo Cluster")
+parser.add_argument("-m", dest="mass",    help="Mass of the DM particle (in GeV)",   required=True, type=float)
+parser.add_argument("-c", dest="channel", help="Annihilation channel",               required=True, choices=[1, 2, 3, 4, 5], type=int)
+parser.add_argument("-t", dest="model",   help="DM Template",                        required=True, choices=["GAO", "B01"])
+parser.add_argument("-a", dest="add",     help="A flag to add the M87 point source", default=0)
+parser.add_argument("-e", dest="exp",     help="Experiment name of the add flag is True", choices=["VERITAS", "MAGIC"])
+parser.add_argument("-v", dest="verbose", help="Verbosity of the script",            default=True)
+parsed_args = parser.parse_args()
+
+mass             = parsed_args.mass
+channel          = parsed_args.channel
+DM_model         = parsed_args.model
+add_point_source = parsed_args.add
 if add_point_source:
     try:
-        experiment = sys.argv[5]
+        experiment = parsed_args.exp
     except:
         experiment = 'VERITAS'
         
-verbose = True
+verbose = parsed_args.verbose
+
 print("running for mass {} GeV".format(mass))
 print("            channel {}".format(channel))
 
