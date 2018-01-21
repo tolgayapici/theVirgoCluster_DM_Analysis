@@ -34,6 +34,9 @@ calc_TS = True#False
 
 class Sources():
 
+    def __init__(self):
+        self.ebl_model_name = None
+    
     def set_mass(self, mass):
         self.mass = mass
 
@@ -42,6 +45,9 @@ class Sources():
 
     def set_model(self, model_name):
         self.model_name = model_name
+
+    def set_EBL_model(self, ebl_model_name=None):
+        self.ebl_model_name = ebl_model_name
         
     def set_M87(self):
         print(DM_model)
@@ -57,6 +63,9 @@ class Sources():
         spec_M87.sigmav        = 1e-22
         spec_M87.channel       = self.channel
         spec_M87.J.fix         = True
+        if self.ebl_model_name is None:
+            spec_M87.set_EBL_model(self.ebl_model_name, 0.004)
+            
         # set source
         self.source_M87 = PointSource("M87", dec=self.dec_M87, ra=self.ra_M87, spectral_shape=spec_M87)
     
@@ -73,6 +82,8 @@ class Sources():
         spec_M49.sigmav        = 1e-22
         spec_M49.channel       = self.channel
         spec_M49.J.fix         = True
+        if self.ebl_model_name is None:
+            spec_M49.set_EBL_model(self.ebl_model_name, 0.004)
         # set source
         self.source_M49 = PointSource("M49", dec=self.dec_M49, ra=self.ra_M49, spectral_shape=spec_M49)
     
@@ -143,6 +154,7 @@ parser.add_argument("-c", dest="channel", help="Annihilation channel",          
 parser.add_argument("-t", dest="model",   help="DM Template",                        required=True, choices=["GAO", "B01"])
 parser.add_argument("-a", dest="add",     help="A flag to add the M87 point source", default=0)
 parser.add_argument("-e", dest="exp",     help="Experiment name of the add flag is True", choices=["VERITAS", "MAGIC"])
+parser.add_argument("--ebl", dest="ebl",  help="EBL model to be used in the flux calculations", choices=['gilmore', 'dominguez', 'finke'], default=None)
 parser.add_argument("-v", dest="verbose", help="Verbosity of the script",            default=True)
 parsed_args = parser.parse_args()
 
@@ -155,8 +167,8 @@ if add_point_source:
         experiment = parsed_args.exp
     except:
         experiment = 'VERITAS'
-        
 verbose = parsed_args.verbose
+ebl_model = parsed_args.ebl
 
 print("running for mass {} GeV".format(mass))
 print("            channel {}".format(channel))
@@ -164,6 +176,7 @@ print("            channel {}".format(channel))
 sources = Sources()
 sources.set_mass(float(mass))
 sources.set_channel(int(float(channel)))
+sources.set_EBL_model(ebl_model)
 sources.setup(data=experiment)
 
 if add_point_source == 0:
