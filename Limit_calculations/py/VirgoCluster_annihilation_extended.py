@@ -1,4 +1,8 @@
 
+# take care of matplotlib to use correct
+import matplotlib as mpl
+mpl.use("agg")
+
 # stop ROOT hijacking the command line options
 import ROOT
 ROOT.PyConfig.IgnoreCommandLineOptions = True
