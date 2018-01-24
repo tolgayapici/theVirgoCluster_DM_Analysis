@@ -118,3 +118,6 @@ model_maps/*
 
 log
 DONT_COMMIT
+*png
+*pdf
+*eps
