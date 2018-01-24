@@ -117,3 +117,7 @@ model_maps/*
 **/nb/*
 
 log
+DONT_COMMIT
+*png
+*pdf
+*eps
