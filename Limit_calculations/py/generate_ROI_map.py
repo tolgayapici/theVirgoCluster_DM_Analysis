@@ -4,8 +4,11 @@ import numpy as np
 import healpy as hp
 import astropy.units as u
 
-RA  = 187.7035
-DEC = 12.3906
+center_RA  = 187.7035
+center_DEC = 12.3906
+
+mask_center_RA  = 180.0
+mask_center_DEC = 12.0
 
 for nSide in [1024]:
 
@@ -16,22 +19,22 @@ for nSide in [1024]:
     m = np.zeros(nSide*nSide*12)
 
     # Add Crab
-    ra = RA
-    dec = DEC
+    ra = center_RA
+    dec = center_DEC
     radius = 12.
     a = hp.query_disc(nSide,hp.ang2vec((90-dec)*deg,ra*deg),radius*deg)
     for p in a:
         m[p] = 1.
 
     # Remove B0540
-    ra  = RA
-    dec = DEC
-    radius = 0.5
+    ra  = mask_center_RA
+    dec = mask_center_DEC
+    radius = 1.0
     c = hp.query_disc(nSide,hp.ang2vec((90-dec)*deg,ra*deg),radius*deg)
     for p in c:
         m[p] = 0.
 
-    outFile = '../../data/mask_noB_nSide%d.fits.gz' %nSide
+    outFile = '../../data/maskedROI_nSide%d.fits.gz' %nSide
     hp.write_map(outFile,m)
     print('Wrote file %s' %outFile)
 
