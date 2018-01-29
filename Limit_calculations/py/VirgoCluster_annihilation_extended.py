@@ -44,7 +44,8 @@ class Sources():
         self.model_name = model_name
 
     def set_M87(self):
-        print(DM_model)
+        # set source
+        spec_M87               = DMAnnihilationFlux()
         # extended template
         shape_M87    = SpatialTemplate_2D()
         M87_fits_template = "../../J_factor_calculations/templates/M87_{}_Jfactor_template.fits".format(DM_model)
@@ -55,17 +56,17 @@ class Sources():
         self.ra_M87  = fits.open(M87_fits_template)[0].header['CRVAL1']
         self.dec_M87 = fits.open(M87_fits_template)[0].header['CRVAL2']
         # spectrum
-        spec_M87               = DMAnnihilationFlux()
+        self.source_M87 = ExtendedSource("M87",spatial_shape=shape_M87,spectral_shape=spec_M87)
         spec_M87.mass          = self.mass
         spec_M87.J             = np.power(10.,Jmax_M87)
         spec_M87.sigmav.bounds = (crosssection_lo, crosssection_hi)#(1e-24,1e-20)
         spec_M87.sigmav        = 1e-22
         spec_M87.channel       = self.channel
         spec_M87.J.fix         = True
-        # set source
-        self.source_M87 = ExtendedSource("M87",spatial_shape=shape_M87,spectral_shape=spec_M87)
 
     def set_M49(self):
+        # set source
+        spec_M49 = DMAnnihilationFlux()
         # extended template
         shape_M49    = SpatialTemplate_2D()
         M49_fits_template = "../../J_factor_calculations/templates/M49_{}_Jfactor_template.fits".format(DM_model)
@@ -76,39 +77,47 @@ class Sources():
         self.ra_M49  = fits.open(M49_fits_template)[0].header['CRVAL1']
         self.dec_M49 = fits.open(M49_fits_template)[0].header['CRVAL2']
         # spectrum
-        spec_M49 = DMAnnihilationFlux()
+        self.source_M49 = ExtendedSource("M49",spatial_shape=shape_M49,spectral_shape=spec_M49)
         spec_M49.mass          = self.mass
         spec_M49.J             = np.power(10.,Jmax_M49)
         spec_M49.sigmav.bounds = (crosssection_lo, crosssection_hi)#(1e-24,1e-20)
         spec_M49.sigmav        = 1e-22
         spec_M49.channel       = self.channel
         spec_M49.J.fix         = True
-        # set source
-        self.source_M49 = ExtendedSource("M49",spatial_shape=shape_M49,spectral_shape=spec_M49)
 
     def set_M87_pointsource(self, data):
-        if data=='HESS-lower':
-            index = -2.62
-            norm  = 2.43e-13
-        elif data=='HESS-upper':
-            index = -2.22
-            norm  = 11.7e-13
-        elif data=='VERITAS':
-            index = -2.5
-            norm  = 5.6e-13
-        elif data=='VERITAS-upper':
-            index = -2.4
-            norm  = 15.9e-13
+        if data == "HAWC":
+            spec_M87_point          = Cutoff_powerlaw()
+            self.point_M87          = PointSource("M87Point", ra=187.70, dec=12.39, spectral_shape=spec_M87_point)
+            spec_M87_point.K            = 1e-21
+            spec_M87_point.K.bounds     = (1e-26, 1e-19)
+            spec_M87_point.piv          = 1.0 * u.TeV
+            spec_M87_point.piv.fix      = True
+            spec_M87_point.index        = -3.0
+            spec_M87_point.index.bounds = (-5.0, -1.0)
+            spec_M87_point.xc           = 7.0 * u.TeV
+            spec_M87_point.xc.fix       = True
         else:
-            print("problem with the spectral data")
-        # spectrum
-        spec_M87_point = Powerlaw()
-        spec_M87_point.index = index
-        spec_M87_point.K = norm*1e9
-        spec_M87_point.index.fix = True
-        spec_M87_point.K.fix = True
-        # set source
-        self.point_M87  = PointSource("M87Point", ra=187.70, dec=12.39, spectral_shape=spec_M87_point)
+            spec_M87_point = Powerlaw()
+            self.point_M87  = PointSource("M87Point", ra=187.70, dec=12.39, spectral_shape=spec_M87_point)
+            if data=='HESS-lower':
+                index = -2.62
+                norm  = 2.43e-13
+            elif data=='HESS-upper':
+                index = -2.22
+                norm  = 11.7e-13
+            elif data=='VERITAS':
+                index = -2.5
+                norm  = 5.6e-13
+            elif data=='VERITAS-upper':
+                index = -2.4
+                norm  = 15.9e-13
+            else:
+                print("problem with the spectral data")
+            spec_M87_point.index = index
+            spec_M87_point.K = norm*1e9
+            spec_M87_point.index.fix = True
+            spec_M87_point.K.fix = True
 
     def set_ROI(self):
         self.ROI_radius = np.max([self.ra_M87-self.ra_M49, self.dec_M87-self.dec_M49])+10.
@@ -152,22 +161,18 @@ parser = argparse.ArgumentParser(description="This script is to run extended sou
 parser.add_argument("-m", dest="mass",    help="Mass of the DM particle (in GeV)",   required=True, type=float)
 parser.add_argument("-c", dest="channel", help="Annihilation channel",               required=True, choices=[1, 2, 3, 4, 5], type=int)
 parser.add_argument("-t", dest="model",   help="DM Template",                        required=True, choices=["GAO", "B01"])
-parser.add_argument("-a", dest="add",     help="A flag to add the M87 point source", default=0)
-parser.add_argument("-e", dest="exp",     help="Experiment name of the add flag is True", choices=["VERITAS", "MAGIC"])
+parser.add_argument("-a", dest="add",     help="A flag to add the M87 point source", default=0, type=int)
+parser.add_argument("-e", dest="exp",     help="Experiment name of the add flag is True", choices=["VERITAS", "MAGIC", "HAWC"])
 parser.add_argument("-v", dest="verbose", help="Verbosity of the script",            default=True)
 parsed_args = parser.parse_args()
 
-mass             = parsed_args.mass#float(sys.argv[1])
-channel          = parsed_args.channel#int(float(sys.argv[2]))
-DM_model         = parsed_args.model#sys.argv[3]
-add_point_source = parsed_args.add#sys.argv[4]
-if add_point_source:
-    try:
-        experiment = parsed_args.exp#sys.argv[5]
-    except:
-        experiment = 'VERITAS'
+mass             = parsed_args.mass
+channel          = parsed_args.channel
+DM_model         = parsed_args.model
+add_point_source = parsed_args.add
+experiment       = parsed_args.exp
+verbose          = parsed_args.verbose
 
-verbose = parsed_args.verbose#True
 print("running for mass {} GeV".format(mass))
 print("            channel {}".format(channel))
 
@@ -191,7 +196,9 @@ if verbose:
 
 llh = HAWCLike("VirgoCluster", "../../data/maptree.root", "../../data/response.root")
 llh.set_active_measurements(1, 9)
-llh.set_ROI(sources.ROI_RA, sources.ROI_DEC, sources.ROI_radius, True)
+
+#llh.set_ROI(sources.ROI_RA, sources.ROI_DEC, sources.ROI_radius, True)
+llh.set_template_ROI("../../data/maskedROI_nSide1024.fits.gz", 0.5, True)
 print("ROI is set to ({:.2f}, {:.2f}) with r={:.2f}".format(sources.ROI_RA, sources.ROI_DEC, sources.ROI_radius))
 llh.set_model(model)
 datalist = DataList(llh)
