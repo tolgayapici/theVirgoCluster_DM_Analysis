@@ -30,8 +30,8 @@ sys.path.append(".")
 from DMModels import *
 
 calc_TS = True#False
-crosssection_lo = 1e-26
-crosssection_hi = 1e-21
+crosssection_lo = 1e-30
+crosssection_hi = 1e-20
 
 class Sources():
 
@@ -88,7 +88,7 @@ class Sources():
         spec_M87.mass          = self.mass
         spec_M87.J             = np.power(10.,Jmax_M87)
         spec_M87.sigmav.bounds = (crosssection_lo, crosssection_hi)#(1e-24,1e-20)
-        spec_M87.sigmav        = 1e-24
+        spec_M87.sigmav        = 1e-23
         spec_M87.channel       = self.channel
         spec_M87.J.fix         = True
 
@@ -109,7 +109,7 @@ class Sources():
         spec_M49.mass          = self.mass
         spec_M49.J             = np.power(10.,Jmax_M49)
         spec_M49.sigmav.bounds = (crosssection_lo, crosssection_hi)#(1e-24,1e-20)
-        spec_M49.sigmav        = 1e-24
+        spec_M49.sigmav        = 1e-23
         spec_M49.channel       = self.channel
         spec_M49.J.fix         = True
 
@@ -260,7 +260,7 @@ print("will start the LL calculations")
 lo = np.log10(best_fit)
 lo_TS = TS_max
 del_lo_TS = 2.71 - (TS_max-lo_TS)
-hi = lo + 1.0
+hi = lo + 3.0
 model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = 10**hi
 hi_TS = llh.calc_TS()
 del_hi_TS = 2.71 - (TS_max-hi_TS)
