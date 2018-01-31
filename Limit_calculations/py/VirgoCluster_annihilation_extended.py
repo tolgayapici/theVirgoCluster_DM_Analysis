@@ -1,7 +1,3 @@
-# set matplotlib
-import matplotlib as mpl
-mpl.use("agg")
-
 # take care of matplotlib to use correct
 import matplotlib as mpl
 mpl.use("agg")
@@ -36,6 +32,7 @@ crosssection_hi = 1e-20
 class Sources():
 
     def __init__(self, model):
+        self.ebl_model_name    = None
         self.DM_model          = model
         self.M87_fits_template_org = "../../J_factor_calculations/templates/M87_{}_Jfactor_template.fits".format(DM_model)
         self.M49_fits_template_org = "../../J_factor_calculations/templates/M49_{}_Jfactor_template.fits".format(DM_model)

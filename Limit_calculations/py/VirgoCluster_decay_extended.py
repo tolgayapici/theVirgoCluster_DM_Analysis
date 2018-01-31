@@ -1,22 +1,64 @@
-from threeML import *
+# take care of matplotlib to use correct
+import matplotlib as mpl
+mpl.use("agg")
+
+# stop ROOT hijacking the command line options
+import ROOT
+ROOT.PyConfig.IgnoreCommandLineOptions = True
+
+import warnings
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    from threeML import *
+
 import numpy as np
 import pdb
 import os
+import shutil
 import matplotlib.pyplot as plt
 
 from astropy.io import fits
+
+import argparse
 
 import sys
 sys.path.append(".")
 from DMModels import *
 
-RA  = 187.70355641
-DEC = 12.39063989
-
-calc_TS = False
+calc_TS = True#False
+lifetime_lo = 1e20
+lifetime_hi = 1e30
 
 class Sources():
 
+    def __init__(self, model):
+        self.ebl_model_name    = None
+        self.DM_model          = model
+        self.M87_fits_template_org = "../../D_factor_calculations/templates/M87_{}_Dfactor_template.fits".format(DM_model)
+        self.M49_fits_template_org = "../../D_factor_calculations/templates/M49_{}_Dfactor_template.fits".format(DM_model)
+        self.M87_fits_template = self.M87_fits_template_org
+        self.M49_fits_template = self.M49_fits_template_org
+        
+    def shift_templates(self, ra, dec):
+        hdus = fits.open(self.M87_fits_template)
+        hdus[0].header['CRVAL1'] += ra
+        hdus[0].header['CRVAL2'] += dec
+        if os.path.isfile(self.M87_fits_template_org.replace(".fits", "_shifted.fits")):
+            print("removing existing shifted template")
+            os.remove(self.M87_fits_template_org.replace(".fits", "_shifted.fits"))
+        hdus.writeto(self.M87_fits_template_org.replace(".fits", "_shifted.fits"))
+        shutil.copy(self.M87_fits_template_org.replace(".fits", ".txt"), self.M87_fits_template.replace(".fits", "_shifted.txt")) 
+        self.M87_fits_template = self.M87_fits_template_org.replace(".fits", "_shifted.fits")
+        hdus = fits.open(self.M49_fits_template)
+        hdus[0].header['CRVAL1'] += ra
+        hdus[0].header['CRVAL2'] += dec
+        if os.path.isfile(self.M49_fits_template_org.replace(".fits", "_shifted.fits")):
+            print("removing existing shifted template")
+            os.remove(self.M49_fits_template_org.replace(".fits", "_shifted.fits"))
+        shutil.copy(self.M49_fits_template_org.replace(".fits", ".txt"), self.M49_fits_template_org.replace(".fits", "_shifted.txt")) 
+        hdus.writeto(self.M49_fits_template_org.replace(".fits", "_shifted.fits"))
+        self.M49_fits_template = self.M49_fits_template_org.replace(".fits", "_shifted.fits")
+        
     def set_mass(self, mass):
         self.mass = mass
 
@@ -25,78 +67,83 @@ class Sources():
 
     def set_model(self, model_name):
         self.model_name = model_name
-        
+
     def set_M87(self):
-        print(DM_model)
+        # set source
+        spec_M87               = DMDecayFlux()
         # extended template
         shape_M87    = SpatialTemplate_2D()
-        M87_fits_template = "../../D_factor_calculations/templates/M87_{}_Dfactor_template.fits".format(DM_model)
-        shape_M87.load_file(M87_fits_template)
-        f_M87 = open(M87_fits_template.replace(".fits", ".txt"), "r")
+        #M87_fits_template = "../../D_factor_calculations/templates/M87_{}_Dfactor_template.fits".format(DM_model)
+        shape_M87.load_file(self.M87_fits_template)
+        f_M87 = open(self.M87_fits_template.replace(".fits", ".txt"), "r")
         line  = f_M87.readline()
         Dmax_M87 = float(line.split("=")[1])
-        self.ra_M87  = fits.open(M87_fits_template)[0].header['CRVAL1']
-        self.dec_M87 = fits.open(M87_fits_template)[0].header['CRVAL2']
-
+        self.ra_M87  = fits.open(self.M87_fits_template)[0].header['CRVAL1']
+        self.dec_M87 = fits.open(self.M87_fits_template)[0].header['CRVAL2']
         # spectrum
-        spec_M87               = DMDecayFlux()
+        self.source_M87 = ExtendedSource("M87",spatial_shape=shape_M87,spectral_shape=spec_M87)
         spec_M87.mass          = self.mass
-        spec_M87.D             = np.power(10., Dmax_M87)
-        spec_M87.tau.bounds    = (1e24, 1e30)
-        spec_M87.tau           = 1e26
+        spec_M87.D             = np.power(10.,Dmax_M87)
+        spec_M87.tau.bounds = (lifetime_lo, lifetime_hi)#(1e-24,1e-20)
+        spec_M87.tau        = 1e26
         spec_M87.channel       = self.channel
         spec_M87.D.fix         = True
 
-        # set source
-        self.source_M87 = ExtendedSource("M87",spatial_shape=shape_M87,spectral_shape=spec_M87)
-    
     def set_M49(self):
+        # set source
+        spec_M49 = DMDecayFlux()
         # extended template
         shape_M49    = SpatialTemplate_2D()
-        M49_fits_template = "../../D_factor_calculations/templates/M49_{}_Dfactor_template.fits".format(DM_model)
-        shape_M49.load_file(M49_fits_template)
-        f_M49 = open(M49_fits_template.replace(".fits", ".txt"), "r")
+        #M49_fits_template = "../../D_factor_calculations/templates/M49_{}_Jfactor_template.fits".format(DM_model)
+        shape_M49.load_file(self.M49_fits_template)
+        f_M49 = open(self.M49_fits_template.replace(".fits", ".txt"), "r")
         line  = f_M49.readline()
         Dmax_M49 = float(line.split("=")[1])
-        self.ra_M49  = fits.open(M49_fits_template)[0].header['CRVAL1']
-        self.dec_M49 = fits.open(M49_fits_template)[0].header['CRVAL2']
-
+        self.ra_M49  = fits.open(self.M49_fits_template)[0].header['CRVAL1']
+        self.dec_M49 = fits.open(self.M49_fits_template)[0].header['CRVAL2']
         # spectrum
-        spec_M49 = DMDecayFlux()
+        self.source_M49 = ExtendedSource("M49",spatial_shape=shape_M49,spectral_shape=spec_M49)
         spec_M49.mass          = self.mass
-        spec_M49.D             = np.power(10., Dmax_M49)
-        spec_M49.tau.bounds    = (1e24, 1e30)
-        spec_M49.tau           = 1e26
+        spec_M49.D             = np.power(10.,Dmax_M49)
+        spec_M49.tau.bounds = (lifetime_lo, lifetime_hi)#(1e-24,1e-20)
+        spec_M49.tau        = 1e26
         spec_M49.channel       = self.channel
         spec_M49.D.fix         = True
 
-        # set source
-        self.source_M49 = ExtendedSource("M49",spatial_shape=shape_M49,spectral_shape=spec_M49)
-    
     def set_M87_pointsource(self, data):
-        if data=='HESS-lower':
-            index = -2.62
-            norm  = 2.43e-13
-        elif data=='HESS-upper':
-            index = -2.22
-            norm  = 11.7e-13
-        elif data=='VERITAS':
-            index = -2.5
-            norm  = 5.6e-13
-        elif data=='VERITAS-upper':
-            index = -2.4
-            norm  = 15.9e-13
+        if data == "HAWC":
+            spec_M87_point          = Cutoff_powerlaw()
+            self.point_M87          = PointSource("M87Point", ra=187.70, dec=12.39, spectral_shape=spec_M87_point)
+            spec_M87_point.K            = 1e-21
+            spec_M87_point.K.bounds     = (1e-26, 1e-19)
+            spec_M87_point.piv          = 1.0 * u.TeV
+            spec_M87_point.piv.fix      = True
+            spec_M87_point.index        = -3.0
+            spec_M87_point.index.bounds = (-5.0, -1.0)
+            spec_M87_point.xc           = 7.0 * u.TeV
+            spec_M87_point.xc.fix       = True
         else:
-            print("problem with the spectral data")
-        # spectrum
-        spec_M87_point = Powerlaw()
-        spec_M87_point.index = index
-        spec_M87_point.K = norm*1e9
-        spec_M87_point.index.fix = True
-        spec_M87_point.K.fix = True
-        # set source
-        self.point_M87  = PointSource("M87Point", ra=187.70, dec=12.39, spectral_shape=spec_M87_point)
-    
+            spec_M87_point = Powerlaw()
+            self.point_M87  = PointSource("M87Point", ra=187.70, dec=12.39, spectral_shape=spec_M87_point)
+            if data=='HESS-lower':
+                index = -2.62
+                norm  = 2.43e-13
+            elif data=='HESS-upper':
+                index = -2.22
+                norm  = 11.7e-13
+            elif data=='VERITAS':
+                index = -2.5
+                norm  = 5.6e-13
+            elif data=='VERITAS-upper':
+                index = -2.4
+                norm  = 15.9e-13
+            else:
+                print("problem with the spectral data")
+            spec_M87_point.index = index
+            spec_M87_point.K = norm*1e9
+            spec_M87_point.index.fix = True
+            spec_M87_point.K.fix = True
+
     def set_ROI(self):
         self.ROI_radius = np.max([self.ra_M87-self.ra_M49, self.dec_M87-self.dec_M49])+10.
         self.ROI_RA     = np.mean([self.ra_M87, self.ra_M49])
@@ -107,9 +154,9 @@ class Sources():
         self.set_M49()
         self.set_M87_pointsource(data)
         self.set_ROI()
-        
+
 class Identity(Function1D):
-    r"""                                                                                                                              
+    r"""
     description :
         Identity function
 
@@ -134,23 +181,34 @@ class Identity(Function1D):
     def evaluate(self, x, scale):
         return scale * x
 
-mass    = float(sys.argv[1])
-channel = int(float(sys.argv[2]))
-DM_model = sys.argv[3]
-add_point_source = sys.argv[4]
-if add_point_source:
-    try:
-        experiment = sys.argv[5]
-    except:
-        experiment = 'VERITAS'
-        
-verbose = True
+
+parser = argparse.ArgumentParser(description="This script is to run extended source DM search for the Virgo Cluster")
+parser.add_argument("-m",    dest="mass",    help="Mass of the DM particle (in GeV)",   required=True, type=float)
+parser.add_argument("-c",    dest="channel", help="Decay channel",               required=True, choices=[1, 2, 3, 4, 5], type=int)
+parser.add_argument("-t",    dest="model",   help="DM Template",                        required=True, choices=["GAO", "B01"])
+parser.add_argument("-a",    dest="add",     help="A flag to add the M87 point source", default=0, type=int)
+parser.add_argument("-e",    dest="exp",     help="Experiment name of the add flag is True", choices=["VERITAS", "MAGIC", "HAWC"])
+parser.add_argument("-v",    dest="verbose", help="Verbosity of the script",            default=True)
+parser.add_argument("-sra",  dest="shiftra", help="shift in ra for the expected limit calculations",  default=0., type=float)
+parser.add_argument("-sdec", dest="shiftdec", help="shift in dec for the expected limit calculations", default=0., type=float)
+parsed_args = parser.parse_args()
+
+mass             = parsed_args.mass
+channel          = parsed_args.channel
+DM_model         = parsed_args.model
+add_point_source = parsed_args.add
+experiment       = parsed_args.exp
+verbose          = parsed_args.verbose
+ra_shift         = parsed_args.shiftra
+dec_shift        = parsed_args.shiftdec
+
 print("running for mass {} GeV".format(mass))
 print("            channel {}".format(channel))
 
-sources = Sources()
+sources = Sources(DM_model)
 sources.set_mass(float(mass))
 sources.set_channel(int(float(channel)))
+sources.shift_templates(ra_shift, dec_shift)
 sources.setup(data=experiment)
 
 if add_point_source == 0:
@@ -159,7 +217,7 @@ else:
     model = Model(sources.source_M87, sources.source_M49,
                   sources.point_M87)
 
-model.link(model.M87.spectrum.main.DMDecayFlux.tau, 
+model.link(model.M87.spectrum.main.DMDecayFlux.tau,
            model.M49.spectrum.main.DMDecayFlux.tau,
            Identity())
 
@@ -168,7 +226,9 @@ if verbose:
 
 llh = HAWCLike("VirgoCluster", "../../data/maptree.root", "../../data/response.root")
 llh.set_active_measurements(1, 9)
-llh.set_ROI(sources.ROI_RA, sources.ROI_DEC, sources.ROI_radius, True)
+
+#llh.set_ROI(sources.ROI_RA, sources.ROI_DEC, sources.ROI_radius, True)
+llh.set_template_ROI("../../data/maskedROI_nSide1024.fits.gz", 0.5, True)
 print("ROI is set to ({:.2f}, {:.2f}) with r={:.2f}".format(sources.ROI_RA, sources.ROI_DEC, sources.ROI_radius))
 llh.set_model(model)
 datalist = DataList(llh)
@@ -177,29 +237,70 @@ jl = JointLikelihood(model, datalist, verbose=True)
 jl.set_minimizer("ROOT")
 
 if calc_TS:
-    jl.fit(quiet=False)
-    print("TS_max: {}".format(llh.calc_TS()))
-    print("Best fit sigmav: {}".format(model.M87.spectrum.main.DMDecayFlux.tau))
+    #jl.fit(quiet=True)
+    #best_fit_TS = llh.calc_TS()
+    jl.fit(quiet=True)
+    TS_max = llh.calc_TS()
+    print("TS_max: {}".format(TS_max))
+    print("Best fit tau: {}".format(model.M87.spectrum.main.DMDecayFlux.tau))
     llh.write_model_map("../results/model_maps/{}GeV_{}.root".format(mass, channel))
-
+    
 # calculate the profile for 95% CL computation
-search_size = 40
-norms = np.linspace(25, 29, search_size)
+search_size = 60
+best_fit    = model.M87.spectrum.main.DMDecayFlux.tau.value
+norms = np.linspace(np.log10(best_fit)-.1, np.log10(best_fit)+1., search_size)
 LLs  = np.zeros(search_size)
-
+TSs  = np.zeros(search_size)
 print("will start the LL calculations")
 
-for i in range(search_size):
-    LLs[i] = jl.minus_log_like_profile(norms[i])
+# this part is being re-written
+hi = np.log10(best_fit)
+hi_TS = TS_max
+del_hi_TS = 2.71 - (TS_max-hi_TS)
+lo = hi - 3.0
+model.M49.spectrum.main.DMDecayFlux.tau.value = 10**lo
+lo_TS = llh.calc_TS()
+del_lo_TS = 2.71 - (TS_max-lo_TS)
+tol = 1e-3
+while True:
+    mid = (lo+hi)/2.
+    model.M49.spectrum.main.DMDecayFlux.tau.value = 10**mid
+    mid_TS = llh.calc_TS()
+    del_mid_TS = 2.71 - (TS_max-mid_TS)
+    if np.fabs(del_mid_TS) < tol:
+        norm_95cl = mid
+        TS_95cl   = mid_TS
+        print("difference: {}".format(TS_95cl))
+        print("limit:      {}".format(norm_95cl))
+        break
+    else:
+        if del_mid_TS*del_hi_TS > 0:
+            hi = mid
+        else:
+            lo = mid
+        print("current value: {}".format(mid))
+        print("current TS:    {}".format(mid_TS))
+        print("current diff:  {}".format(del_mid_TS))
     
-delLLs = LLs - LLs.min()
-imin   = np.argmin(delLLs)
-plt.semilogx(10**norms, delLLs)
-plt.xlim(1e25, 1e28)
-plt.ylim(0, 3)
+#for i in range(search_size):
+#    #model.M49.spectrum.main.DMAnnihilationFlux.tau.value = 10**norms[i]
+#    #TSs[i] = llh.calc_TS()
+#    #print(norms[i], TSs[i])
+#    LLs[i] = jl.minus_log_like_profile(norms[i])
+#    
+#    print(llh.calc_TS())
 
-plt.savefig("../results/LL_profiles/decay_{}GeV_{}_{}.eps".format(mass, channel, DM_model))
-interpolator = interp1d(delLLs[:imin],10**norms[:imin], kind='cubic', fill_value='extrapolate')
-norm_95cl = interpolator(2.71/2.)
+#plt.semilogx(10**norms, TSs-best_fit_TS)
+#plt.show()
 
-print("95% CL norm: {}".format(norm_95cl))
+#delLLs = LLs - LLs.min()
+#imin   = np.argmin(delLLs)
+#plt.semilogx(10**norms, delLLs)
+#plt.xlim(np.log10(best_fit)-.1, np.log10(best_fit)+.6)
+#plt.ylim(0, 3)
+#plt.savefig("../results/LL_profiles/annihilation_{}GeV_{}_{}.eps".format(mass, channel, DM_model))
+#interpolator = interp1d(delLLs[imin:],10**norms[imin:], kind='cubic', fill_value='extrapolate')
+#norm_95cl = interpolator(2.71/2.)
+
+print("95% CL norm: {}".format(10**norm_95cl))
+

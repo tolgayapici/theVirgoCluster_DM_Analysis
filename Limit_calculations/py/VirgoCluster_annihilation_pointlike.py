@@ -14,6 +14,7 @@ with warnings.catch_warnings():
 import numpy as np
 import pdb
 import os
+import shutil
 import matplotlib.pyplot as plt
 
 from astropy.io import fits
@@ -31,12 +32,14 @@ Jfactor_M87_med = 3.40e+18
 Jfactor_M49_med = 1.06e+18
 
 calc_TS = True#False
+crosssection_lo = 1e-30
+crosssection_hi = 1e-18
 
 class Sources():
 
     def __init__(self):
         self.ebl_model_name = None
-
+    
     def set_mass(self, mass):
         self.mass = mass
 
@@ -48,45 +51,46 @@ class Sources():
 
     def set_EBL_model(self, ebl_model_name=None):
         self.ebl_model_name = ebl_model_name
-
+        
     def set_M87(self):
         print(DM_model)
         # extended template
         M87_fits_template = "../../J_factor_calculations/templates/M87_{}_Jfactor_template.fits".format(DM_model)
         self.ra_M87  = fits.open(M87_fits_template)[0].header['CRVAL1']
         self.dec_M87 = fits.open(M87_fits_template)[0].header['CRVAL2']
-        # set source
-        spec_M87               = DMAnnihilationFlux()
-        self.source_M87 = PointSource("M87", dec=self.dec_M87, ra=self.ra_M87, spectral_shape=spec_M87)
         # spectrum
+        spec_M87               = DMAnnihilationFlux()
         spec_M87.mass          = self.mass
         spec_M87.J             = Jfactor_M87_med
-        spec_M87.sigmav.bounds = (1e-26,1e-20)
-        spec_M87.sigmav        = 1e-22
+        spec_M87.sigmav.bounds = (crosssection_lo, crosssection_hi)
+        spec_M87.sigmav        = 1e-23
         spec_M87.channel       = self.channel
         spec_M87.J.fix         = True
         if self.ebl_model_name is None:
             spec_M87.set_EBL_model(self.ebl_model_name, 0.004)
-
+            
+        # set source
+        self.source_M87 = PointSource("M87", dec=self.dec_M87, ra=self.ra_M87, spectral_shape=spec_M87)
+    
     def set_M49(self):
         # extended template
         M49_fits_template = "../../J_factor_calculations/templates/M49_{}_Jfactor_template.fits".format(DM_model)
         self.ra_M49  = fits.open(M49_fits_template)[0].header['CRVAL1']
         self.dec_M49 = fits.open(M49_fits_template)[0].header['CRVAL2']
-        # set source
-        spec_M49 = DMAnnihilationFlux()
-        self.source_M49 = PointSource("M49", dec=self.dec_M49, ra=self.ra_M49, spectral_shape=spec_M49)
         # spectrum
+        spec_M49 = DMAnnihilationFlux()
         spec_M49.mass          = self.mass
         spec_M49.J             = Jfactor_M49_med
-        spec_M49.sigmav.bounds = (1e-26,1e-20)
-        spec_M49.sigmav        = 1e-22
+        spec_M49.sigmav.bounds = (crosssection_lo, crosssection_hi)
+        spec_M49.sigmav        = 1e-23
         spec_M49.channel       = self.channel
         spec_M49.J.fix         = True
         if self.ebl_model_name is None:
             spec_M49.set_EBL_model(self.ebl_model_name, 0.004)
-
-    def set_ext_M87_pointsource(self, data):
+        # set source
+        self.source_M49 = PointSource("M49", dec=self.dec_M49, ra=self.ra_M49, spectral_shape=spec_M49)
+    
+    def set_M87_pointsource(self, data):
         if data=='HESS-lower':
             index = -2.62
             norm  = 2.43e-13
@@ -101,30 +105,15 @@ class Sources():
             norm  = 15.9e-13
         else:
             print("problem with the spectral data")
-        # set source
-        spec_ext_M87_point = Powerlaw()
-        self.ext_point_M87  = PointSource("M87Point_ext", ra=187.70, dec=12.39, spectral_shape=spec_ext_M87_point)
         # spectrum
-        spec_ext_M87_point.index = index
-        spec_ext_M87_point.K = norm*1e9
-        spec_ext_M87_point.index.fix = True
-        spec_ext_M87_point.K.fix = True
-
-    def set_M87_pointsource(self):
-
+        spec_M87_point = Powerlaw()
+        spec_M87_point.index = index
+        spec_M87_point.K = norm*1e9
+        spec_M87_point.index.fix = True
+        spec_M87_point.K.fix = True
         # set source
-        spec_M87        = Cutoff_powerlaw()
-        self.point_M87  = PointSource("M87Point", ra=187.70, dec=12.39, spectral_shape=spec_M87)
-        spec_M87.K      = 1e-21
-        spec_M87.K.bounds = (1e-26, 1e-19)
-        spec_M87.piv      = 2.0 * u.TeV
-        spec_M87.piv.fix  = True
-        spec_M87.index        = -3.0
-        spec_M87.index.bounds = (-5.0, -1.0)
-        spec_M87.xc     = 6. * u.TeV
-        spec_M87.xc.fix = True
-
-
+        self.point_M87  = PointSource("M87Point", ra=187.70, dec=12.39, spectral_shape=spec_M87_point)
+    
     def set_ROI(self):
         self.ROI_radius = np.max([self.ra_M87-self.ra_M49, self.dec_M87-self.dec_M49])+10.
         self.ROI_RA     = np.mean([self.ra_M87, self.ra_M49])
@@ -133,14 +122,11 @@ class Sources():
     def setup(self, data='VERITAS'):
         self.set_M87()
         self.set_M49()
-        if data == "HAWC":
-            self.set_M87_pointsource()
-        else:
-            self.set_ext_M87_pointsource(data)
+        self.set_M87_pointsource(data)
         self.set_ROI()
-
+        
 class Identity(Function1D):
-    r"""
+    r"""                                                                                                                              
     description :
         Identity function
 
@@ -169,8 +155,8 @@ parser = argparse.ArgumentParser(description="This script is to run extended sou
 parser.add_argument("-m", dest="mass",    help="Mass of the DM particle (in GeV)",   required=True, type=float)
 parser.add_argument("-c", dest="channel", help="Annihilation channel",               required=True, choices=[1, 2, 3, 4, 5], type=int)
 parser.add_argument("-t", dest="model",   help="DM Template",                        required=True, choices=["GAO", "B01"])
-parser.add_argument("-a", dest="add",     help="A flag to add the M87 point source", default=0, type=int)
-parser.add_argument("-e", dest="exp",     help="Experiment name of the add flag is True", choices=["VERITAS", "MAGIC", "HAWC"], default="HAWC")
+parser.add_argument("-a", dest="add",     help="A flag to add the M87 point source", default=0)
+parser.add_argument("-e", dest="exp",     help="Experiment name of the add flag is True", choices=["VERITAS", "MAGIC"])
 parser.add_argument("--ebl", dest="ebl",  help="EBL model to be used in the flux calculations", choices=['gilmore', 'dominguez', 'finke'], default=None)
 parser.add_argument("-v", dest="verbose", help="Verbosity of the script",            default=True)
 parsed_args = parser.parse_args()
@@ -179,13 +165,16 @@ mass             = parsed_args.mass
 channel          = parsed_args.channel
 DM_model         = parsed_args.model
 add_point_source = parsed_args.add
-experiment       = parsed_args.exp
-verbose          = parsed_args.verbose
-ebl_model        = parsed_args.ebl
+if add_point_source:
+    try:
+        experiment = parsed_args.exp
+    except:
+        experiment = 'VERITAS'
+verbose = parsed_args.verbose
+ebl_model = parsed_args.ebl
 
 print("running for mass {} GeV".format(mass))
 print("            channel {}".format(channel))
-print(experiment)
 
 sources = Sources()
 sources.set_mass(float(mass))
@@ -193,26 +182,19 @@ sources.set_channel(int(float(channel)))
 sources.set_EBL_model(ebl_model)
 sources.setup(data=experiment)
 
-print(add_point_source)
-if add_point_source == 1:
-    print(experiment)
-    if experiment == "HAWC":
-        model = Model(sources.source_M87, sources.source_M49, sources.point_M87)
-    else:
-        model = Model(sources.source_M87, sources.source_M49, sources.ext_point_M87)
-else:
+if add_point_source == 0:
     model = Model(sources.source_M87, sources.source_M49)
+    #model = Model(sources.source_M49)
+else:
+    model = Model(sources.source_M87, sources.source_M49,
+                  sources.point_M87)
 
-model.link(model.M87.spectrum.main.DMAnnihilationFlux.sigmav,
+model.link(model.M87.spectrum.main.DMAnnihilationFlux.sigmav, 
            model.M49.spectrum.main.DMAnnihilationFlux.sigmav,
            Identity())
 
 if verbose:
     model.display()
-
-import time
-time.sleep(20)
-
 
 llh = HAWCLike("VirgoCluster", "../../data/maptree.root", "../../data/response.root")
 llh.set_active_measurements(1, 9)
@@ -226,16 +208,45 @@ jl.set_minimizer("ROOT")
 
 if calc_TS:
     jl.fit(quiet=False)
-    print("TS_max: {}".format(llh.calc_TS()))
-    print("Best fit sigmav: {}".format(model.M87.spectrum.main.DMAnnihilationFlux.sigmav))
+    best_fit_TS = llh.calc_TS()
+    jl.fit(quiet=False)
+    TS_max = llh.calc_TS()
+    print("TS_max: {}".format(TS_max))
+    print("Best fit sigmav: {}".format(model.M49.spectrum.main.DMAnnihilationFlux.sigmav))
     llh.write_model_map("../results/model_maps/point_source/{}GeV_{}.root".format(mass, channel))
 
-if add_point_source ==1 and experiment == "HAWC":
-    model.M87Point.spectrum.main.Cutoff_powerlaw.K.fix = True
-    model.M87Point.spectrum.main.Cutoff_powerlaw.index.fix = True
-    model.M87Point.spectrum.main.Cutoff_powerlaw.xc.fix = True
-    model.M87Point.spectrum.main.Cutoff_powerlaw.piv.fix = True
+# this part is being re-written
+best_fit    = model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value
+lo = np.log10(best_fit)
+lo_TS = TS_max
+del_lo_TS = 2.71 - (TS_max-lo_TS)
+hi = lo + 3.0
+model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = 10**hi
+hi_TS = llh.calc_TS()
+del_hi_TS = 2.71 - (TS_max-hi_TS)
+tol = 1e-3
+while True:
+    mid = (lo+hi)/2.
+    model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = 10**mid
+    mid_TS = llh.calc_TS()
+    del_mid_TS = 2.71 - (TS_max-mid_TS)
+    if np.fabs(del_mid_TS) < tol:
+        norm_95cl = mid
+        TS_95cl   = mid_TS
+        print("difference: {}".format(TS_95cl))
+        print("limit:      {}".format(norm_95cl))
+        break
+    else:
+        if del_mid_TS*del_hi_TS > 0:
+            hi = mid
+        else:
+            lo = mid
+        print("current value: {}".format(mid))
+        print("current TS:    {}".format(mid_TS))
+        print("current diff:  {}".format(del_mid_TS))
 
+"""
+    
 # calculate the profile for 95% CL computation
 search_size = 40
 best_fit    = model.M87.spectrum.main.DMAnnihilationFlux.sigmav.value
@@ -255,6 +266,7 @@ plt.ylim(0, 3)
 plt.savefig("../results/LL_profiles/annihilation_{}GeV_{}_{}.eps".format(mass, channel, DM_model))
 interpolator = interp1d(delLLs[imin:],10**norms[imin:], kind='cubic', fill_value='extrapolate')
 norm_95cl = interpolator(2.71/2.)
+"""
 
-print("95% CL norm: {}".format(norm_95cl))
+print("95% CL norm: {}".format(10**norm_95cl))
 
