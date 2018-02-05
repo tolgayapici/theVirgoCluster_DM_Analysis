@@ -1,6 +1,9 @@
+import os
+
 # take care of matplotlib to use correct
-import matplotlib as mpl
-mpl.use("agg")
+if os.environ.get('HOME') is not "/home/tyapici":
+    import matplotlib as mpl
+    mpl.use("agg")
 
 # stop ROOT hijacking the command line options
 import ROOT
@@ -13,7 +16,6 @@ with warnings.catch_warnings():
 
 import numpy as np
 import pdb
-import os
 import shutil
 import matplotlib.pyplot as plt
 
@@ -23,10 +25,10 @@ import argparse
 
 import sys
 sys.path.append(".")
-from DMModels import *
+from DMModels2 import *
 
 calc_TS = True#False
-crosssection_lo = 1e-30
+crosssection_lo = -1e-20
 crosssection_hi = 1e-20
 
 class Sources():
@@ -191,6 +193,8 @@ parser.add_argument("-e",    dest="exp",     help="Experiment name of the add fl
 parser.add_argument("-v",    dest="verbose", help="Verbosity of the script",            default=True)
 parser.add_argument("-sra",  dest="shiftra", help="shift in ra for the expected limit calculations",  default=0., type=float)
 parser.add_argument("-sdec", dest="shiftdec", help="shift in dec for the expected limit calculations", default=0., type=float)
+parser.add_argument("--maptree",  dest="maptree", default="../../data/maptree.root")
+parser.add_argument("--response", dest="response", default="../../data/response.root")
 parsed_args = parser.parse_args()
 
 mass             = parsed_args.mass
@@ -201,6 +205,7 @@ experiment       = parsed_args.exp
 verbose          = parsed_args.verbose
 ra_shift         = parsed_args.shiftra
 dec_shift        = parsed_args.shiftdec
+maptree          = parsed_args.maptree
 
 print("running for mass {} GeV".format(mass))
 print("            channel {}".format(channel))
@@ -224,7 +229,7 @@ model.link(model.M87.spectrum.main.DMAnnihilationFlux.sigmav,
 if verbose:
     model.display()
 
-llh = HAWCLike("VirgoCluster", "../../data/maptree.root", "../../data/response.root")
+llh = HAWCLike("VirgoCluster", maptree, "../../data/response.root")#"../../data/maptree.root", "../../data/response.root")
 llh.set_active_measurements(1, 9)
 
 #llh.set_ROI(sources.ROI_RA, sources.ROI_DEC, sources.ROI_radius, True)
@@ -235,6 +240,75 @@ datalist = DataList(llh)
 
 jl = JointLikelihood(model, datalist, verbose=True)
 jl.set_minimizer("ROOT")
+
+val = np.linspace(-1e-22, 1e-22)
+TS  = []
+for v in val:
+    model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = v
+    current_TS = (llh.calc_TS())
+    TS.append(current_TS)
+    print(v, current_TS)
+TS = np.array(TS)
+max_index = np.argmax(TS)
+print("max at: {} max TS: {}".format(val[max_index], TS[max_index]))
+print("second iteration")
+val = np.linspace(val[max_index]/5., val[max_index]*5., 50)
+TS  = []
+for v in val:
+    model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = v
+    current_TS = (llh.calc_TS())
+    TS.append(current_TS)
+    print(v, current_TS)
+TS = np.array(TS)
+max_index = np.argmax(TS)
+print("max at: {} max TS: {}".format(val[max_index], TS[max_index]))
+print("plotting")
+
+plt.plot(val, TS)
+plt.show()
+
+# this part is being re-written
+best_fit = val[max_index]
+TS_max   = TS[max_index]
+
+if best_fit < 0:
+    print("the best fit is negative. taking care of it now")
+    best_fit = 0
+    model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = best_fit
+    TS_max = llh.calc_TS()
+
+lo = best_fit
+lo_TS = TS_max
+del_lo_TS = 2.71 - (TS_max-lo_TS)
+hi = lo*20.
+if hi == 0:
+    hi = 1e-22
+model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = hi
+hi_TS = llh.calc_TS()
+del_hi_TS = 2.71 - (TS_max-hi_TS)
+rel_err = 1e-2
+while True:
+    mid = (lo+hi)/2.
+    model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = mid
+    mid_TS = llh.calc_TS()
+    del_mid_TS = 2.71 - (TS_max-mid_TS)
+    if np.fabs(del_mid_TS) < rel_err:
+        norm_95cl = mid
+        TS_95cl   = mid_TS
+        print("difference: {}".format(TS_95cl))
+        print("limit:      {}".format(norm_95cl))
+        break
+    else:
+        if del_mid_TS*del_hi_TS > 0:
+            hi = mid
+        else:
+            lo = mid
+        print("current value: {}".format(mid))
+        print("current TS:    {}".format(mid_TS))
+        print("current diff:  {}".format(del_mid_TS))
+
+
+"""
 
 if calc_TS:
     jl.fit(quiet=True)
@@ -281,7 +355,9 @@ while True:
         print("current value: {}".format(mid))
         print("current TS:    {}".format(mid_TS))
         print("current diff:  {}".format(del_mid_TS))
-    
+   
+"""
+
 #for i in range(search_size):
 #    #model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = 10**norms[i]
 #    #TSs[i] = llh.calc_TS()
@@ -302,5 +378,5 @@ while True:
 #interpolator = interp1d(delLLs[imin:],10**norms[imin:], kind='cubic', fill_value='extrapolate')
 #norm_95cl = interpolator(2.71/2.)
 
-print("95% CL norm: {}".format(10**norm_95cl))
+#print("95% CL norm: {}".format(10**norm_95cl))
 
