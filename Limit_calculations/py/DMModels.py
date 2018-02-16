@@ -14,7 +14,7 @@ class DMAnnihilationFlux(Function1D):
         description :
 
             Class that evaluates the spectrum for a DM particle of a given
-            mass, channel, cross section, and J-factor. 
+            mass, channel, cross section, and J-factor.
 
             The parameterization is given by
 
@@ -31,12 +31,12 @@ class DMAnnihilationFlux(Function1D):
                 desc : DM mass (GeV)
                 initial value : 10000
                 fix : yes
-                
+
             J :
                 desc : Target total J-factor (GeV^2 cm^-5)
                 initial value : 1.e20
                 fix : yes
-                
+
             channel :
                 desc : DM annihilation channel
                 initial value : 4
@@ -64,9 +64,11 @@ class DMAnnihilationFlux(Function1D):
 
     def print_channel_in_text(self):
         return self.channel_mapping[self.channel.value]
-        
+
     def set_EBL_model(self, model_name, red_shift):
+        print("EBL MODEL IN DMMODELS {}".format(model_name))
         if model_name in self.avail_EBL_models:
+            print("Setting EBL model to {}".format(model_name))
             self.ebl          = EBLattenuation()
             self.red_shift    = red_shift
             self.ebl.redshift = red_shift
@@ -76,10 +78,10 @@ class DMAnnihilationFlux(Function1D):
 
     def set_print_spec(self, choice):
         self.print_spec = choice
-            
+
     def unset_EBL_model(self):
         self.ebl = None
-            
+
     def update_setup(self):
         spectrum = DMSpectra(self.mass, self.channel)
         self._interp = spectrum.get_spectra()
@@ -118,7 +120,7 @@ class DMAnnihilationFlux(Function1D):
             plt.savefig("example_spectrum_{}GeV_{}.pdf".format(self.mass.value, self.channel.value))
             self.print_spec = False
         """ END OF DEBUGGING """
-            
+
         return flux
 
 class DMDecayFlux(Function1D):
@@ -126,7 +128,7 @@ class DMDecayFlux(Function1D):
         description :
 
             Class that evaluates the spectrum for a DM particle of a given
-            mass, channel, cross section, and J-factor. 
+            mass, channel, cross section, and J-factor.
 
             The parameterization is given by
 
@@ -143,12 +145,12 @@ class DMDecayFlux(Function1D):
                 desc : DM mass (GeV)
                 initial value : 10000
                 fix : yes
-                
+
             D :
                 desc : Target total D-factor (GeV cm^-2)
                 initial value : 1.e20
                 fix : yes
-                
+
             channel :
                 desc : DM annihilation channel
                 initial value : 4
@@ -157,7 +159,7 @@ class DMDecayFlux(Function1D):
             tau :
                 desc : DM decay lifetime (s)
                 initial value : 1.e25
-                min value : 1e23
+                min value : -1e20
                 max value : 1e30
                 fix: no
 
@@ -176,7 +178,7 @@ class DMDecayFlux(Function1D):
 
     def print_channel_in_text(self):
         return self.channel_mapping[self.channel.value]
-        
+
     def set_EBL_model(self, model_name, red_shift):
         if model_name in self.avail_EBL_models:
             self.ebl          = EBLattenuation()
@@ -188,10 +190,10 @@ class DMDecayFlux(Function1D):
 
     def set_print_spec(self, choice):
         self.print_spec = choice
-            
+
     def unset_EBL_model(self):
         self.ebl = None
-            
+
     def update_setup(self):
         spectrum = DMSpectra(self.mass, self.channel)
         self._interp = spectrum.get_spectra()
@@ -230,5 +232,5 @@ class DMDecayFlux(Function1D):
             plt.savefig("example_spectrum_{}GeV_{}.pdf".format(self.mass.value, self.channel.value))
             self.print_spec = False
         """ END OF DEBUGGING """
-            
+
         return flux
