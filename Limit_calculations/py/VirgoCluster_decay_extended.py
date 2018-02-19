@@ -60,7 +60,9 @@ class DecaySources(Sources):
         spec_M87.tau        = 1e26
         spec_M87.channel       = self.channel
         spec_M87.D.fix         = True
-
+        if self.ebl_model_name is not None:
+            spec_M87.set_EBL_model(self.ebl_model_name, 0.004)
+        
     def set_M49(self):
         # set source
         spec_M49 = DMDecayFlux()
@@ -81,7 +83,9 @@ class DecaySources(Sources):
         spec_M49.tau        = 1e26
         spec_M49.channel       = self.channel
         spec_M49.D.fix         = True
-
+        if self.ebl_model_name is not None:
+            spec_M49.set_EBL_model(self.ebl_model_name, 0.004)
+            
 class DecayLimitCalculator(LimitCalculator):
 
     def find_max_TS(self):
@@ -191,6 +195,7 @@ parser.add_argument("-e",    dest="exp",     help="Experiment name of the add fl
 parser.add_argument("-v",    dest="verbose", help="Verbosity of the script",            default=True)
 parser.add_argument("-sra",  dest="shiftra", help="shift in ra for the expected limit calculations",  default=0., type=float)
 parser.add_argument("-sdec", dest="shiftdec", help="shift in dec for the expected limit calculations", default=0., type=float)
+parser.add_argument("--ebl", dest="ebl",  help="EBL model to be used in the flux calculations", choices=['gilmore', 'dominguez', 'finke'], default=None)
 parser.add_argument("--maptree",  dest="maptree", default="../../data/maptree.root")
 parser.add_argument("--response", dest="response", default="../../data/response.root")
 parsed_args = parser.parse_args()
@@ -203,6 +208,7 @@ experiment       = parsed_args.exp
 verbose          = parsed_args.verbose
 ra_shift         = parsed_args.shiftra
 dec_shift        = parsed_args.shiftdec
+ebl_model        = parsed_args.ebl
 maptree          = parsed_args.maptree
 
 print("running for mass {} GeV".format(mass))
@@ -211,6 +217,7 @@ print("            channel {}".format(channel))
 sources = DecaySources(DM_model)
 sources.set_mass(float(mass))
 sources.set_channel(int(float(channel)))
+sources.set_EBL_model(ebl_model_name=ebl_model)
 #sources.shift_templates(ra_shift, dec_shift)
 sources.setup(data=experiment)
 
