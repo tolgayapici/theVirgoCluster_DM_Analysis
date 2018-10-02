@@ -36,9 +36,9 @@ class LimitCalculator:
         self.max = maximum
 
     def redefine_range(self):
-        self.model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = 1e-24
+        self.model.M49.spectrum.main.RangedPowerlaw.K.value = 1e-10
         val1 = (self.llh.calc_TS())
-        self.model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = -1e-24
+        self.model.M49.spectrum.main.RangedPowerlaw.K.value = 1e-25
         val2 = (self.llh.calc_TS())
         if val1 < 0:
             self.max = 0
@@ -50,7 +50,7 @@ class LimitCalculator:
         TS  = []
         last_TS  = -9e9
         for curr_val in val:
-            self.model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = curr_val
+            self.model.M49.spectrum.main.RangedPowerlaw.K.value = curr_val
             current_TS = (self.llh.calc_TS())
             TS.append(current_TS)
             if self.verbose:
@@ -72,12 +72,12 @@ class LimitCalculator:
             max_ = self.max
             self.max = self.min
             self.min = max_
-        print(self.model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value)
-        self.model.M49.spectrum.main.DMAnnihilationFlux.sigmav.bounds = (self.min, self.max)
+        print(self.model.M49.spectrum.main.RangedPowerlaw.K.value)
+        self.model.M49.spectrum.main.RangedPowerlaw.K.bounds = (self.min, self.max)
         #self.jl.set_minimizer("ROOT")
         self.jl.set_minimizer("minuit")
         self.jl.fit(quiet=False)
-        val = (self.model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value)
+        val = (self.model.M49.spectrum.main.RangedPowerlaw.K.value)
         TS  = (self.llh.calc_TS())
         
         if make_model_map:
@@ -92,7 +92,7 @@ class LimitCalculator:
         TS  = []
         last_TS  = -9e9
         for curr_val in val:
-            self.model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = curr_val
+            self.model.M49.spectrum.main.RangedPowerlaw.K.value = curr_val
             current_TS = (self.llh.calc_TS())
             TS.append(current_TS)
             if self.verbose:
@@ -110,7 +110,7 @@ class LimitCalculator:
         TS  = []
         last_TS  = -9e9
         for curr_val in val:
-            self.model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = curr_val
+            self.model.M49.spectrum.main.RangedPowerlaw.K.value = curr_val
             current_TS = (self.llh.calc_TS())
             TS.append(current_TS)
             if self.verbose:
@@ -128,7 +128,7 @@ class LimitCalculator:
         TS  = []
         last_TS = -9e9
         for curr_val in val:
-            self.model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = curr_val
+            self.model.M49.spectrum.main.RangedPowerlaw.K.value = curr_val
             current_TS = (self.llh.calc_TS())
             TS.append(current_TS)
             if self.verbose:
@@ -146,12 +146,12 @@ class LimitCalculator:
         best_fit, TS_max = self.find_max_TS_3ml_style()
         #best_fit, TS_max = self.find_max_TS()
 
-        self.model.M49.spectrum.main.DMAnnihilationFlux.sigmav.bounds = (-1e-24, 1e-15)
+        self.model.M49.spectrum.main.RangedPowerlaw.K.bounds = (-1e-24, 1e-15)
 
         if best_fit < 0 and do_flip:
             print("the best fit is negative. taking care of it now")
             best_fit = 0
-            self.model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = best_fit
+            self.model.M49.spectrum.main.RangedPowerlaw.K.value = best_fit
             TS_max = self.llh.calc_TS()
 
         lo = best_fit
@@ -160,13 +160,13 @@ class LimitCalculator:
         hi = lo*20.
         if hi == 0:
             hi = 1e-15
-        self.model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = hi
+        self.model.M49.spectrum.main.RangedPowerlaw.K.value = hi
         hi_TS = self.llh.calc_TS()
         del_hi_TS = 2.71 - (TS_max-hi_TS)
 
         while True:
             mid = (lo+hi)/2.
-            self.model.M49.spectrum.main.DMAnnihilationFlux.sigmav.value = mid
+            self.model.M49.spectrum.main.RangedPowerlaw.K.value = mid
             mid_TS = self.llh.calc_TS()
             del_mid_TS = 2.71 - (TS_max-mid_TS)
             if np.fabs(del_mid_TS) < rel_err:

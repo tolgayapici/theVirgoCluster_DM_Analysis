@@ -45,7 +45,7 @@ class DMAnnihilationFlux(Function1D):
             sigmav :
                 desc : DM annihilation cross section (cm^3/s)
                 initial value : 1.e-23
-                min value : -1e-20
+                min value : -1e-22
                 max value : 1e-20
                 fix: no
 

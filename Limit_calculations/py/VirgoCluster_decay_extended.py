@@ -88,6 +88,36 @@ class DecaySources(Sources):
             
 class DecayLimitCalculator(LimitCalculator):
 
+    def find_max_TS_3ml_style(self):
+        val = np.logspace(np.log10(self.min), np.log10(self.max), 50)
+        TS  = []
+        last_TS  = -9e9
+        for curr_val in val:
+            self.model.M49.spectrum.main.DMDecayFlux.tau.value = curr_val
+            current_TS = (self.llh.calc_TS())
+            TS.append(current_TS)
+            if self.verbose:
+                print(curr_val, current_TS)
+            if last_TS > current_TS:
+                print(curr_val, current_TS)
+                break
+            last_TS = current_TS
+        TS = np.array(TS)
+        max_index = np.argmax(TS)
+        if self.verbose:
+            print("max at: {} max TS: {}".format(val[max_index], TS[max_index]))
+       # self.redefine_range()
+        self.min = val[max_index-1]
+        self.max = val[max_index+1]
+        self.model.M49.spectrum.main.DMDecayFlux.tau.bounds = (self.min, self.max)
+        #self.jl.set_minimizer("ROOT")
+        self.jl.set_minimizer("minuit")
+        self.jl.fit(quiet=False)
+        val = (self.model.M49.spectrum.main.DMDecayFlux.tau.value)
+        TS  = (self.llh.calc_TS())
+        print(val, TS)
+        return val, TS
+
     def find_max_TS(self):
         val = np.logspace(np.log10(self.min), np.log10(self.max), 50)
         TS  = []
@@ -148,7 +178,9 @@ class DecayLimitCalculator(LimitCalculator):
         return val[max_index], TS[max_index]
     
     def calculate_limit(self, rel_err=1.e-2):
-        best_fit, TS_max = self.find_max_TS()
+        best_fit, TS_max = self.find_max_TS_3ml_style()
+
+        self.model.M49.spectrum.main.DMDecayFlux.tau.bounds = (1e20, 1e40)
 
         if best_fit < 0:
             print("the best fit is negative. taking care of it now")
@@ -189,7 +221,7 @@ class DecayLimitCalculator(LimitCalculator):
 parser = argparse.ArgumentParser(description="This script is to run extended source DM search for the Virgo Cluster")
 parser.add_argument("-m",    dest="mass",    help="Mass of the DM particle (in GeV)",   required=True, type=float)
 parser.add_argument("-c",    dest="channel", help="Decay channel",               required=True, choices=[1, 2, 3, 4, 5], type=int)
-parser.add_argument("-t",    dest="model",   help="DM Template",                        required=True, choices=["min", "med"])
+parser.add_argument("-t",    dest="model",   help="DM Template",                        required=True, choices=["min", "med", "max"])
 parser.add_argument("-a",    dest="add",     help="A flag to add the M87 point source", default=0, type=int)
 parser.add_argument("-e",    dest="exp",     help="Experiment name of the add flag is True", choices=["VERITAS", "MAGIC", "HAWC"])
 parser.add_argument("-v",    dest="verbose", help="Verbosity of the script",            default=True)
@@ -218,7 +250,7 @@ sources = DecaySources(DM_model)
 sources.set_mass(float(mass))
 sources.set_channel(int(float(channel)))
 sources.set_EBL_model(ebl_model_name=ebl_model)
-#sources.shift_templates(ra_shift, dec_shift)
+sources.shift_templates(ra_shift, dec_shift)
 sources.setup(data=experiment)
 
 if add_point_source == 0:

@@ -61,6 +61,7 @@ sources = Sources(DM_model)
 sources.set_mass(float(mass))
 sources.set_channel(int(float(channel)))
 sources.set_EBL_model(ebl_model_name=ebl_model)
+sources.shift_templates(ra_shift, dec_shift)
 sources.setup(data=experiment)
 
 if add_point_source == 0:
@@ -78,5 +79,5 @@ if verbose:
 
 lc = LimitCalculator(maptree, "../../data/response.root", model, verbose=verbose)
 lc.set_ROI(sources.ROI_RA, sources.ROI_DEC, sources.ROI_radius)
-lc.set_range(-1e-21, 1e-20)
+lc.set_range(-1e-20, 1e-20)
 lc.calculate_limit()
