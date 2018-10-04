@@ -5,7 +5,7 @@ import warnings
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     from threeML import *
-
+    
 import shutil
 
 from DMModels import *
@@ -91,7 +91,7 @@ class Sources():
         self.fluxUnit          = (1. / (u.TeV * u.cm**2 * u.s))
         self.ra_M87  = 187.704
         self.dec_M87 = 12.391
-        self.ra_M49 = 187.445
+        self.ra_M49  = 187.445
         self.dec_M49 = 8.004
 
     def shift_templates(self, ra, dec):
@@ -154,8 +154,8 @@ class Sources():
 
     def set_M87_quasidiff(self, K, piv, index, enLo, enHi):
         # set source
-        spec_M87               = RangedPowerlaw()
-        shape_M87      = Disk_on_sphere()
+        spec_M87        = RangedPowerlaw()
+        shape_M87       = Disk_on_sphere()
         self.source_M87 = ExtendedSource("M87",spatial_shape=shape_M87,spectral_shape=spec_M87)
         # extended template
         shape_M87.lon0     = self.ra_M87 * u.deg
@@ -170,9 +170,8 @@ class Sources():
         spec_M87.piv           = piv * u.TeV
         spec_M87.piv.fix       = True
         spec_M87.K             = K * self.fluxUnit
-        spec_M87.K.bounds      = (1e-18*self.fluxUnit, 1e-11*self.fluxUnit)
+        spec_M87.K.bounds      = (1e-25*self.fluxUnit, 1e-10*self.fluxUnit)
         spec_M87.set_energy_range(enLo, enHi)
-        print(self.source_M87)
 
     def set_M49(self):
         # set source
@@ -215,9 +214,8 @@ class Sources():
         spec_M49.piv           = piv * u.TeV
         spec_M49.piv.fix       = True
         spec_M49.K             = K * self.fluxUnit
-        spec_M49.K.bounds      = (1e-18*self.fluxUnit, 1e-11*self.fluxUnit)
+        spec_M49.K.bounds      = (1e-25*self.fluxUnit, 1e-10*self.fluxUnit)
         spec_M49.set_energy_range(enLo, enHi)
-        print(self.source_M49)
 
     def set_M87_pointsource(self, data):
         if data == "HAWC":

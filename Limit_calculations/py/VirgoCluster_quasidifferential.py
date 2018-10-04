@@ -42,16 +42,21 @@ maptree          = parsed_args.maptree
 sources = Sources()
 sources.setup(data=experiment, isQuasiDiff=True)
 
-model = Model(sources.source_M87, sources.source_M49)
+model_M87 = Model(sources.source_M87)
+model_M49 = Model(sources.source_M49)
+model_linked    = Model(sources.source_M87, sources.source_M49)
+model_notlinked = Model(sources.source_M87, sources.source_M49)
 
-model.link(model.M87.spectrum.main.RangedPowerlaw.K,
-           model.M49.spectrum.main.RangedPowerlaw.K,
-           Identity())
+model_linked.link(model_linked.M49.spectrum.main.RangedPowerlaw.K,
+                  model_linked.M87.spectrum.main.RangedPowerlaw.K,
+                  Identity())
+
+models = [model_M87, model_M49, model_linked, model_notlinked]
 
 if verbose:
-    model.display()
+    model_linked.display()
 
-lc = LimitCalculator(maptree, "../../data/response.root", model, verbose=verbose)
-lc.set_ROI(sources.ROI_RA, sources.ROI_DEC, sources.ROI_radius)
-lc.set_range(1e-25, 1e-10)
+lc = LimitCalculator(maptree, "../../data/response.root", models, verbose=verbose)
+#lc.set_ROI(sources.ROI_RA, sources.ROI_DEC, sources.ROI_radius)
+lc.set_range(1e-25, 1e-19)
 lc.calculate_limit()

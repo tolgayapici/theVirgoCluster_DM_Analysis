@@ -6,52 +6,69 @@ with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     from threeML import *
 
+from hawc_hal import HAL, HealpixConeROI
+
 class LimitCalculator:
 
-    def __init__(self, maptree, response, model, verbose=False):
-        self.maptree   = maptree
+    def __init__(self, maptree, response, models, verbose=False):
+        self.maptree  = maptree
         self.response = response
-        self.model    = model
         self.verbose  = verbose
-        # - construct the log likelihood
-        self.llh      = HAWCLike("VirgoCluster", maptree, response)
-        self.llh.set_active_measurements(1, 9)
-        self.llh.set_model(model)
-        self.datalist = DataList(self.llh)
-        self.jl = JointLikelihood(self.model, self.datalist, verbose=True)
-
-    def set_ROI(self, ra, dec, radius):
-        self.llh.set_ROI(ra, dec, radius, True)
-        if self.verbose:
-            print("ROI is set to ({:.2f}, {:.2f}) with r={:.2f}".format(ra, dec, radius))
-
-
-    def set_masked_ROI(self, maskFilename):
-        self.llh.set_template_ROI(maskFilename, 0.5, True)
-        if self.verbose:
-            print("ROI is adjusted according to {filename}".format(filename=maskFilename))
-
+        self.models   = models
+        self.fluxUnit = (1. / (u.TeV * u.cm**2 * u.s))
+        # - construct HAL
+        self.roi      = HealpixConeROI(data_radius=13., model_radius=25., ra=187.5745, dec=10.1974)
+        self.hawc     = HAL("VirgoCluster", maptree, response, self.roi)
+        self.hawc.set_active_measurements(1, 9)
+        self.hawc.display()
+        self.datalist = DataList(self.hawc)
+        # - construct joint likelihood
+        self.jl_M87       = JointLikelihood(self.models[0], self.datalist, verbose=True)
+        self.jl_M49       = JointLikelihood(self.models[1], self.datalist, verbose=True)
+        self.jl_linked    = JointLikelihood(self.models[2], self.datalist, verbose=True)
+        self.jl_notlinked = JointLikelihood(self.models[3], self.datalist, verbose=True)
+        # - set the minimizer
+        self.jl_M87.set_minimizer("minuit")
+        self.jl_M49.set_minimizer("minuit")
+        self.jl_linked.set_minimizer("minuit")
+        self.jl_notlinked.set_minimizer("minuit")
+        
     def set_range(self, minimum, maximum):
         self.min = minimum
         self.max = maximum
 
-    def redefine_range(self):
-        self.model.M49.spectrum.main.RangedPowerlaw.K.value = 1e-10
-        val1 = (self.llh.calc_TS())
-        self.model.M49.spectrum.main.RangedPowerlaw.K.value = 1e-25
-        val2 = (self.llh.calc_TS())
-        if val1 < 0:
-            self.max = 0
-        if val2 < 0:
-            self.min = 0
-
     def find_max_TS_3ml_style(self, make_model_map=True):
-        val = np.linspace(self.min, self.max, 50)
         TS  = []
         last_TS  = -9e9
+        #self.model.M87.spectrum.main.RangedPowerlaw.K.value = 1e-23
+        #current_TS = self.jl.minus_log_like_profile(1e-23)
+        result = self.jl_linked.fit()
+        current_TS = self.jl_linked.minus_log_like_profile(self.jl_linked.likelihood_model.M87.spectrum.main.RangedPowerlaw.K.value,
+                                                           self.jl_linked.likelihood_model.M87.spectrum.main.RangedPowerlaw.K.value)
+        print(current_TS)
+        """
+        current_TS = self.jl_M49.minus_log_like_profile(self.models[2].M87.spectrum.main.RangedPowerlaw.K.value)
+        print(current_TS)
+
+        current_TS = self.jl_linked.minus_log_like_profile(self.models[2].M87.spectrum.main.RangedPowerlaw.K.value,
+                                                           self.models[2].M87.spectrum.main.RangedPowerlaw.K.value)
+        print(current_TS)
+        """
+
+        #print(result)
+        #print(self.jl.compute_TS("M49", result[1]))
+        results = self.jl.get_contours("M87.spectrum.main.RangedPowerlaw.K",
+                                       1e-10,
+                                       1e-25,
+                                       10)
+        print(results)
+        ###profile_vals = self.jl.minus_log_like_profile(val)
+        ###print(profile_vals)
+                
         for curr_val in val:
             self.model.M49.spectrum.main.RangedPowerlaw.K.value = curr_val
-            current_TS = (self.llh.calc_TS())
+            current_TS = self.jl.minus_log_like_profile(curr_val)
+            print(curr_val, current_TS)
             TS.append(current_TS)
             if self.verbose:
                 print(curr_val, current_TS)
@@ -63,7 +80,6 @@ class LimitCalculator:
         if self.verbose:
             print("max at: {} max TS: {}".format(val[max_index], TS[max_index]))
         
-        # self.redefine_range()
         self.min = val[max_index-1]/2.
         self.max = val[max_index+1]*2.
         print("this is where I print to screen")
