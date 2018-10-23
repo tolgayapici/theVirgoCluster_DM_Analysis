@@ -79,13 +79,21 @@ class RangedPowerlaw(Function1D):
                 (K * np.power(xx, index))[np.logical_and((x>=self.enLo*1e9), (x<=self.enHi*1e9))]
             return results
 
+proc_LUT = {"annihilation": "J", "decay": "D"}
+        
 class Sources():
 
-    def __init__(self, model=None):
+    def __init__(self, model="med", process="annihilation"):
         self.ebl_model_name    = None
         self.DM_model          = model
-        self.M87_fits_template_org = "../../J_factor_calculations/templates/M87_{}_Jfactor_template.fits".format(self.DM_model)
-        self.M49_fits_template_org = "../../J_factor_calculations/templates/M49_{}_Jfactor_template.fits".format(self.DM_model)
+        self.DM_process        = process
+        self.DM_proc           = proc_LUT[process]
+        self.M87_fits_template_org = "../../{}_factor_calculations/templates/M87_{}_{}factor_template.fits".format(self.DM_proc,
+                                                                                                                   self.DM_model,
+                                                                                                                   self.DM_proc)
+        self.M49_fits_template_org = "../../{}_factor_calculations/templates/M49_{}_{}factor_template.fits".format(self.DM_proc,
+                                                                                                                   self.DM_model,
+                                                                                                                   self.DM_proc)
         self.M87_fits_template = self.M87_fits_template_org
         self.M49_fits_template = self.M49_fits_template_org
         self.fluxUnit          = (1. / (u.TeV * u.cm**2 * u.s))
@@ -131,10 +139,12 @@ class Sources():
 
     def set_M87(self):
         # set source
-        spec_M87               = DMAnnihilationFlux()
+        if self.DM_process == "annihilation":
+            spec_M87 = DMAnnihilationFlux()
+        else:
+            spec_M87 = DMDecayFlux()
         # extended template
         shape_M87    = SpatialTemplate_2D()
-        #M87_fits_template = "../../J_factor_calculations/templates/M87_{}_Jfactor_template.fits".format(DM_model)
         shape_M87.load_file(self.M87_fits_template)
         f_M87 = open(self.M87_fits_template.replace(".fits", ".txt"), "r")
         line  = f_M87.readline()
@@ -144,15 +154,21 @@ class Sources():
         # spectrum
         self.source_M87 = ExtendedSource("M87",spatial_shape=shape_M87,spectral_shape=spec_M87)
         spec_M87.mass          = self.mass
-        spec_M87.J             = np.power(10.,Jmax_M87)
-        spec_M87.sigmav.bounds = (crosssection_lo, crosssection_hi)#(1e-24,1e-20)
-        spec_M87.sigmav        = 1e-23
         spec_M87.channel       = self.channel
-        spec_M87.J.fix         = True
+        if self.DM_process == "annihilation":
+            spec_M87.J             = np.power(10.,Jmax_M87)
+            spec_M87.sigmav.bounds = (crosssection_lo, crosssection_hi)#(1e-24,1e-20)
+            spec_M87.sigmav        = 1e-23
+            spec_M87.J.fix         = True
+        else:
+            spec_M87.D             = np.power(10.,Jmax_M87)
+            spec_M87.tau.bounds    = (1e22, 1e30)
+            spec_M87.tau           = 1e25
+            spec_M87.D.fix         = True        
         if self.ebl_model_name is not None:
             spec_M87.set_EBL_model(self.ebl_model_name, 0.004)
 
-    def set_M87_quasidiff(self, K, piv, index, enLo, enHi):
+    def set_M87_quasidiff(self, K, index, enLo, enHi):
         # set source
         spec_M87        = RangedPowerlaw()
         shape_M87       = Disk_on_sphere()
@@ -162,23 +178,29 @@ class Sources():
         shape_M87.lon0.fix = True
         shape_M87.lat0     = self.dec_M87 * u.deg
         shape_M87.lat0.fix = True
-        shape_M87.radius     = 5. * u.deg
+        shape_M87.radius     = 3.5 * u.deg
         shape_M87.radius.fix = True
         # spectrum
         spec_M87.index         = index
         spec_M87.index.fix     = True
-        spec_M87.piv           = piv * u.TeV
+        if enLo == 1.:
+            spec_M87.piv       = 1. * u.TeV
+        else:
+            spec_M87.piv       = 10**(0.5*(np.log10(enLo)+np.log10(enHi))) * u.TeV
+        print("setting pivot energy to {}".format(10**(0.5*(np.log10(enLo)+np.log10(enHi)))))
         spec_M87.piv.fix       = True
         spec_M87.K             = K * self.fluxUnit
-        spec_M87.K.bounds      = (1e-25*self.fluxUnit, 1e-10*self.fluxUnit)
+        spec_M87.K.bounds      = (1e-25*self.fluxUnit, 1e-8*self.fluxUnit)
         spec_M87.set_energy_range(enLo, enHi)
 
     def set_M49(self):
         # set source
-        spec_M49 = DMAnnihilationFlux()
+        if self.DM_process == "annihilation":
+            spec_M49 = DMAnnihilationFlux()
+        else:
+            spec_M49 = DMDecayFlux()
         # extended template
         shape_M49    = SpatialTemplate_2D()
-        #M49_fits_template = "../../J_factor_calculations/templates/M49_{}_Jfactor_template.fits".format(DM_model)
         shape_M49.load_file(self.M49_fits_template)
         f_M49 = open(self.M49_fits_template.replace(".fits", ".txt"), "r")
         line  = f_M49.readline()
@@ -188,15 +210,21 @@ class Sources():
         # spectrum
         self.source_M49 = ExtendedSource("M49",spatial_shape=shape_M49,spectral_shape=spec_M49)
         spec_M49.mass          = self.mass
-        spec_M49.J             = np.power(10.,Jmax_M49)
-        spec_M49.sigmav.bounds = (crosssection_lo, crosssection_hi)#(1e-24,1e-20)
-        spec_M49.sigmav        = 1e-23
         spec_M49.channel       = self.channel
-        spec_M49.J.fix         = True
+        if self.DM_process == "annihilation":
+            spec_M49.J             = np.power(10.,Jmax_M49)
+            spec_M49.sigmav.bounds = (crosssection_lo, crosssection_hi)#(1e-24,1e-20)
+            spec_M49.sigmav        = 1e-23
+            spec_M49.J.fix         = True
+        else:
+            spec_M49.D             = np.power(10.,Jmax_M49)
+            spec_M49.tau.bounds    = (1e22, 1e30)
+            spec_M49.tau           = 1e25
+            spec_M49.D.fix         = True
         if self.ebl_model_name is not None:
             spec_M49.set_EBL_model(self.ebl_model_name, 0.004)
 
-    def set_M49_quasidiff(self, K, piv, index, enLo, enHi):
+    def set_M49_quasidiff(self, K, index, enLo, enHi):
         # set source
         spec_M49 = RangedPowerlaw()
         shape_M49      = Disk_on_sphere()
@@ -206,23 +234,27 @@ class Sources():
         shape_M49.lon0.fix = True
         shape_M49.lat0     = self.dec_M49 * u.deg
         shape_M49.lat0.fix = True
-        shape_M49.radius     = 2. * u.deg
+        shape_M49.radius     = 1.5 * u.deg
         shape_M49.radius.fix = True
         # spectrum
         spec_M49.index         = index
         spec_M49.index.fix     = True
-        spec_M49.piv           = piv * u.TeV
+        if enLo == 1.:
+            spec_M49.piv       = 1. * u.TeV
+        else:
+            spec_M49.piv       = 10**(0.5*(np.log10(enLo)+np.log10(enHi))) * u.TeV
+        print("setting pivot energy to {}".format(10**(0.5*(np.log10(enLo)+np.log10(enHi)))))
         spec_M49.piv.fix       = True
         spec_M49.K             = K * self.fluxUnit
-        spec_M49.K.bounds      = (1e-25*self.fluxUnit, 1e-10*self.fluxUnit)
+        spec_M49.K.bounds      = (1e-25*self.fluxUnit, 1e-8*self.fluxUnit)
         spec_M49.set_energy_range(enLo, enHi)
 
     def set_M87_pointsource(self, data):
         if data == "HAWC":
             spec_M87_point          = Cutoff_powerlaw()
             self.point_M87          = PointSource("M87Point", ra=187.70, dec=12.39, spectral_shape=spec_M87_point)
-            spec_M87_point.K            = 1e-21
-            spec_M87_point.K.bounds     = (1e-26, 1e-19)
+            spec_M87_point.K            = 1e-25
+            spec_M87_point.K.bounds     = (1e-26, 1e-17)
             spec_M87_point.piv          = 1.0 * u.TeV
             spec_M87_point.piv.fix      = True
             spec_M87_point.index        = -3.0
@@ -257,13 +289,13 @@ class Sources():
         self.ROI_DEC    = np.mean([self.dec_M87, self.dec_M49])
         print(self.ROI_RA, self.ROI_DEC, self.ROI_radius)
 
-    def setup(self, data='VERITAS', isQuasiDiff=False):
+    def setup(self, data='VERITAS', isQuasiDiff=False, enLo=1., enHi=100., index=-2.0):
         if not isQuasiDiff:
             self.set_M87()
             self.set_M49()
         else:
-            self.set_M87_quasidiff(5*self.fluxUnit, 1., -2.0, 1., 100.)
-            self.set_M49_quasidiff(5*self.fluxUnit, 1., -2.0, 1., 100.)
+            self.set_M87_quasidiff(1e-27*self.fluxUnit, index, enLo, enHi)
+            self.set_M49_quasidiff(1e-27*self.fluxUnit, index, enLo, enHi)
         self.set_M87_pointsource(data)
         self.set_ROI()
 
